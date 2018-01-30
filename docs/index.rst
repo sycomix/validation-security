@@ -6,3 +6,4 @@ validation-security
     
        release-notes
        contributing
+       architecture
