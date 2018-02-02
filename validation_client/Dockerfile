@@ -3,4 +3,4 @@ COPY . /app
 WORKDIR /app
 
 RUN pip install -r requirements.txt
-CMD  ["python", "app7.py"]
+CMD  ["python", "validation_client.py"]

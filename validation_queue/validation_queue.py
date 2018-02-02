@@ -1,15 +1,31 @@
+#! python
+# -*- coding: utf-8 -*-
+# ================================================================================
+# ACUMOS
+# ================================================================================
+# Copyright © 2017 AT&T Intellectual Property & Tech Mahindra. All rights reserved.
+# ================================================================================
+# This Acumos software file is distributed by AT&T and Tech Mahindra
+# under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# This file is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ================================================================================
 from flask import Flask, jsonify
 from flask import request
 import requests
 import json
 from flask import abort
-import uuid
 
 app = Flask(__name__)
 
 # Validation task types = SS, LS, TA, OQ
-data = {"status": 'Pass', 'artifactValidationStatus': [{'artifactTaskId': '4ab4fcb8-fd91-4885-be7c-163acd683ee7', 'validationTaskType': 'SS',  'status': 'Pass', 'artifactId': '38daf266-cd85-4bb0-a4db-5b3263defa7b'}], 'taskId': '38daf266-cd85-4bb0-a4db-5b3263defa7b','visibility':"PB", 'solutionId':'38daf266-cd85-4bb0-a4db-5b3263defa7b', 'revisionId' : '4ab4fcb8-fd91-4885-be7c-163acd683ee7'}
-
 
 tasks = []
 
@@ -36,9 +52,9 @@ def create_task():
     g = task['task_details']['task_id1']
     p = task['task_details']['task_id2']
 
-    base_url = ('http://localhost:9605/status',k)
-    base_url1 = ('http://localhost:9605/status',g)
-    base_url3 = ('http://localhost:9605/status',p)
+    base_url = (URL_TASK_STATUS,k)
+    base_url1 = (URL_TASK_STATUS,g)
+    base_url3 = (URL_TASK_STATUS,p)
 
     new_url =  '/'.join(base_url)
     new_url1 =  '/'.join(base_url1)
@@ -52,7 +68,7 @@ def create_task():
     license_object = f.json()
     textSearch_object = z.json()
 
-    base_url2 = ('http://cognita-ist2-vm01-core:8083/validation',task['task_details']['principle_task_id'])
+    base_url2 = (URL_PORTAL,task['task_details']['principle_task_id'])
     new_url2 =  '/'.join(base_url2)
 
     if virus_object["state"]== "SUCCESS":

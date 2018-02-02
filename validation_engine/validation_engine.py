@@ -1,3 +1,22 @@
+#! python
+# -*- coding: utf-8 -*-
+# ================================================================================
+# ACUMOS
+# ================================================================================
+# Copyright © 2017 AT&T Intellectual Property & Tech Mahindra. All rights reserved.
+# ================================================================================
+# This Acumos software file is distributed by AT&T and Tech Mahindra
+# under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# This file is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ================================================================================
 import os
 import json
 import glob
@@ -10,32 +29,12 @@ from celery import Celery
 from flasgger import Swagger
 import requests
 import uuid
-tasks = [
-    {
-        'solutionId': 1,
-        'revisionId': '2',
-        'artifacts': "",
-        'requestToPublish': 'Organization'
-    },
-    {
-        'solutionId': 42,
-        'revisionId': '3',
-        'artifacts': "",
-        'requestToPublish': 'Public'
-    }
-]
+
+
 
 app = Flask(__name__)
 swagger = Swagger(app)
 app.config['SECRET_KEY'] = 'top-secret!'
-
-
-
-
-
-
-
-
 
 
 
@@ -53,11 +52,11 @@ def long_task(self):
             message = '{0} {1} ...'.format(verb[i],
                                               noun[0])
         self.update_state(state='PROGRESS',
-                          meta={'current': i*(20), 'total': total, 'solutionId':'12jkh12jkh',
+                          meta={'current': i*(20), 'total': total, 
                                 'status': message})
         result = virus_scan()
         time.sleep(1)
-    return {'current': 100, 'total': 100,'solutionId':'12jkh12jkh',  'status': 'Virus Scan completed!',
+    return {'current': 100, 'total': 100,  'status': 'Virus Scan completed!',
             'result': result}
 
 
@@ -78,12 +77,12 @@ def long_task1(self):
             message = '{0} {1} ...'.format(verb[i],
                                               noun[0])
         self.update_state(state='PROGRESS',
-                          meta={'current': i*(20), 'total': total, 'solutionId':'12jkh12jkh',
+                          meta={'current': i*(20), 'total': total,
                                 'status': message})
 
         result = 'pass'
         time.sleep(1)
-    return {'current': 100, 'total': 100,'solutionId':'12jkh12jkh',  'status': 'License scanning completed!',
+    return {'current': 100, 'total': 100,  'status': 'License scanning completed!',
             'result': result}
 
 @celery.task(bind=True)
@@ -99,13 +98,15 @@ def long_task3(self):
             message = '{0} {1} ...'.format(verb[i],
                                               noun[0])
         self.update_state(state='PROGRESS',
-                          meta={'current': i*(20), 'total': total, 'solutionId':'12jkh12jkh',
+                          meta={'current': i*(20), 'total': total,
                                 'status': message})
 
         result = 'pass'
         time.sleep(1)
-    return {'current': 100, 'total': 100,'solutionId':'12jkh12jkh',  'status': 'Keyword search completed!',
+    return {'current': 100, 'total': 100,  'status': 'Keyword search completed!',
             'result': result}
+
+
 
 @celery.task(bind=True)
 def long_task4(self):
@@ -120,34 +121,16 @@ def long_task4(self):
             message = '{0} {1} ...'.format(verb[i],
                                               noun[0])
         self.update_state(state='PROGRESS',
-                          meta={'current': i*(20), 'total': total, 'solutionId':'12jkh12jkh',
+                          meta={'current': i*(20), 'total': total, 
                                 'status': message})
 
         result = 'pass'
         time.sleep(1)
-    return {'current': 100, 'total': 100,'solutionId':'12jkh12jkh',  'status': 'Verify model completed!',
+    return {'current': 100, 'total': 100,  'status': 'Verify model completed!',
             'result': result}
 
 
-# The Virus Scan function
 
-def virus_scan():
-
- #   List1.append(task1)
-   # jsonstr = json.dumps(List1)
-    os.system("bandit blog_ex.py -f json -o outputfile ")
-
-#Scan for an outputfile
-    x = glob.glob('outputfile*')
-    #if the file exists parse the file for the results and make a decision
-    if len(x) == 1:
-        with open('outputfile') as data_file:
-            data = json.load(data_file)
-
-        if data["results"][0]["issue_severity"] in ['HIGH','MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH','MEDIUM'] :
-            return 'Fail'
-        else:
-            return 'Pass'
 
 @app.route('/invoketask', methods=['GET'])
 def index():
