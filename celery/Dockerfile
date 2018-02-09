@@ -7,4 +7,4 @@ WORKDIR /app
 RUN pip install -r requirements.txt
 RUN sed -i 's/REDIS_HOST/'"${REDIS_HOST}"'/' /app/config.py
 RUN sed -i 's/REDIS_PORT/'"${REDIS_PORT}"'/' /app/config.py
-CMD  ["python", "app_model5.py"]
+CMD  ["python", "root.py"]

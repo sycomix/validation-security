@@ -3,4 +3,4 @@ COPY .  /app
 WORKDIR /app
 RUN pip install -r requirements.txt
 
-CMD  ["python", "app8.py"]
+CMD  ["python", "validation_queue.py"]
