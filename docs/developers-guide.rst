@@ -1,6 +1,6 @@
-============
-Architecture
-============
+=================
+Developer's Guide
+=================
 
 Scope and Definitions
 =====================
@@ -27,7 +27,7 @@ Components
 ==========
 
 The Validation and Security (V&S) is a microservice written in Python and
-packaged as a Docker image.
+packaged as Docker images.
 
 Asynchronous REST APIs
 ----------------------
@@ -36,20 +36,20 @@ The V&S microservice uses the `Flask <http://flask.pocoo.org/>`__
 microframework and `Flassger <https://github.com/rochacbruno/flasgger>`__ to
 implement REST APIs.
 
-Wrapper API
-~~~~~~~~~~~
+validation_client API
+~~~~~~~~~~~~~~~~~~~~~
 
-The Wrapper API listens for communication from the Portal back end.
+The validation_client service listens for communication from the Portal back end.
 
-Intermediate API
+validation_middleware API
 ~~~~~~~~~~~~~~~~
 
-The Intermediate service sends communications to the Portal back end.
+The validation_middleware service sends communications to the Portal back end.
 
-Root API
-~~~~~~~~
+validation_engine API
+~~~~~~~~~~~~~~~~~~~~~
 
-The Root API is the brains, facilitating the distributed computing of the
+The validation_engine service is the brains, facilitating the distributed computing of the
 business rules. This is where the license checking and keyword search
 functionality resides.
 
