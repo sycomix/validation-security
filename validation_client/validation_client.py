@@ -17,13 +17,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ================================================================================
+
+import os
 from flask import Flask, jsonify
 import requests
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import request
 from flask import abort
-import uuid
 import json
 from flasgger import Swagger
 
@@ -33,6 +34,11 @@ swagger = Swagger(app)
 
 
 tasks = []
+
+# Definition of URLs
+URL_INVOKE_TASK = os.environ['URL_INVOKE_TASK']
+URL_TASK_STATUS = os.environ['URL_TASK_STATUS']
+URL_TODO_TASK = os.environ['URL_TODO_TASK']
 
 data = {
     'status': None,
@@ -47,17 +53,32 @@ data = {
 
 @app.route('/status/v1.0/tasks', methods=['GET'])
 def update_task():
-    taskid = tasks[0]['task_details']['task_id']
-    base_url = (URL_TASK_STATUS,taskid)
-    new_url =  '/'.join(base_url)
-    q = requests.get(new_url)
+    virus_id = tasks[0]['task_details']['virus_task_id']
+    license_id = tasks[0]['task_details']['license_task_id']
+    text_search_id = tasks[0]['task_details']['text_task_id']
 
-    return jsonify({'task': q.json()})
+    virus_url = '/'.join((URL_TASK_STATUS, 'securityScan', virus_id))
+    license_url = '/'.join((URL_TASK_STATUS, 'licenseComp', license_id))
+    text_search_url = '/'.join((URL_TASK_STATUS, 'keywordScan', text_search_id))
 
-#POST verb usage
+    q = requests.get(virus_url)
+    f = requests.get(license_url)
+    z = requests.get(text_search_url)
+
+    virus_object = q.json()
+    license_object = f.json()
+    text_search_object = z.json()
+    task = {
+        'Security Scan': virus_object,
+        'License Compliance': license_object,
+        'Keyword Search': text_search_object
+    }
+    return jsonify({'task': task})
+
+
+# OST verb usage
 @app.route('/status/v1.0/tasks', methods=['POST'])
 def create_task():
-
 
     """
     This is an example
@@ -76,50 +97,24 @@ def create_task():
           $ref: '#/definitions/Task'
     """
 
-#    if not request.json:
-#`       abort(400)
-#    tasks = []
-    t = requests.get(URL_INVOKE_TASK)
-    l= t.json()
+    if not request.json:
+        abort(400)
+
     task = {
         'solutionId': request.json['solutionId'],
         'revisionId': request.json['revisionId'],
         'visibility': request.json['visibility'],
-        'artifactValidations':request.json['artifactValidations'],
-        'task_details': l
+        'artifactValidations': request.json['artifactValidations']
     }
+    t = requests.post(URL_INVOKE_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+    task_details = t.json()
+    task['task_details'] = task_details
     tasks.append(task)
-    r = requests.get(URL_TASK_STATUS)
-# POST verb on the api
-    s = requests.post(URL_TASK_STATUS,json.dumps(task),headers={"Content-type":"application/json; charset=utf8"})
 
-# Process Id's
-    virus_id = l['virus_task_id']
-    license_id = l['license_task_id']
-    textSearch_id = l['text_task_id']
+    r = requests.get(URL_TODO_TASK)
+    # POST verb on the api
+    s = requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
 
-# Creating the base URLs
-    virus_base_url = (URL_TASK_STATUS,virus_id)
-    license_base_url = (URL_TASK_STATUS,license_id)
-    textSearch_base_url = (URL_TASK_STATUS,textSearch_id)
-
-# Creating the full URLs
-    virus_url =  '/'.join(virus_base_url)
-    license_url =  '/'.join(license_base_url)
-    textSearch_url =  '/'.join(textSearch_base_url)
-
-    q = requests.get(virus_url)
-    f = requests.get(license_url)
-    z = requests.get(textSearch_url)
-    base_url2 = (URL_PORTAL,l['principle_task_id'])
-    new_url2 =  '/'.join(base_url2)
-
-    virus_object = q.json()
-    license_object = f.json()
-
-
-
-#    return jsonify({'task': task,"virus": q.json(),"license":f.json(), "textSearch":z.json()}), 201
     return jsonify({'task': task}), 201
 
 
@@ -131,11 +126,14 @@ def logTest():
     app.logger.info('testing info log')
     return "Code Handbook !! Log testing."
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
+    # formatter = logging.Formatter("%(asctime)s | %(pathname)s:%(lineno)d | %(levelname)s | %(module)s | %(funcName)s | %(message)s ")
+    formatter = logging.Formatter("%(asctime)s | %(pathname)s | %(levelname)s | %(module)s | %(funcName)s | %(message)s")
     logHandler = RotatingFileHandler('info.log', maxBytes=1000, backupCount=1)
-    logHandler.setLevel(logging.INFO)
-    app.logger.setLevel(logging.INFO)
+    logHandler.setLevel(logging.DEBUG)
+    logHandler.setFormatter(formatter)
+    app.logger.setLevel(logging.DEBUG)
     app.logger.addHandler(logHandler)
 
     app.run(host="0.0.0.0",port=9603 ,debug=True)
