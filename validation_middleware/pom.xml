@@ -4,7 +4,7 @@
         <!-- This file publishes Docker name and tag for the LF Jenkins build script -->
         <groupId>IGNORED</groupId>
         <!-- docker image name -->
-        <artifactId>validation-celery</artifactId>
+        <artifactId>validation-middleware</artifactId>
         <!-- docker tag -->
         <version>1.0-SNAPSHOT</version>
 </project>
