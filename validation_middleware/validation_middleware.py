@@ -17,6 +17,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ================================================================================
+
 import os
 from flask import Flask, jsonify
 from flask import request
@@ -27,6 +28,7 @@ from logging.handlers import RotatingFileHandler
 from flask import abort
 from flasgger import Swagger
 import time
+from datetime import datetime
 
 app = Flask(__name__)
 swagger = Swagger(app)
@@ -45,14 +47,8 @@ data = {
 }
 
 # Definition of URLs
-URL_PORTAL = os.environ['URL_PORTAL']
-URL_TASK_STATUS = os.environ['URL_TASK_STATUS']
-
-
-# GET verb usage
-@app.route('/todo/api/v1.0/tasks', methods=['GET'])
-def get_tasks():
-    return jsonify({'tasks': tasks})
+URL_PORTAL = os.environ.get('URL_PORTAL', None)
+URL_ONBOARDING_CONTROLLER = os.environ.get('URL_ONBOARDING_CONTROLLER', None)
 
 
 # POST verb usage
@@ -66,7 +62,9 @@ def create_task():
         'revisionId': request.json["revisionId"],
         'visibility': request.json['visibility'],
         'artifactValidations': request.json['artifactValidations'],
-        'task_details': request.json["task_details"]
+        'task_details': request.json["task_details"],
+        'trackingId': request.json["trackingId"],
+        'userId': request.json["userId"]
     }
 
     portal_base_url = (URL_PORTAL, task['task_details']['principle_task_id'])
@@ -74,77 +72,126 @@ def create_task():
 
     # getting virus scan task status and sending back to backend portal
     if 'virus_task_id' in task['task_details']:
-        virus_id = task['task_details']['virus_task_id']
-        virus_url = '/'.join((URL_TASK_STATUS, 'securityScan', virus_id))
-        q = requests.get(virus_url)
-        virus_object = q.json()
-
-        time.sleep(2)
-        if virus_object["state"] != "":
-            data['status'] = virus_object["status"]
+        if task['task_details']["state"] != "":
+            data['status'] = task['task_details']["status"]
             data['taskId'] = task['task_details']['principle_task_id']
             data['solutionId'] = task['solutionId']
             data['revisionId'] = task['revisionId']
             data['visibility'] = task['visibility']
 
-            data['artifactValidationStatus'][0]['status'] = virus_object["result"]
-            data['artifactValidationStatus'][0]['artifactTaskId'] = virus_id
+            data['artifactValidationStatus'][0]['status'] = task['task_details']["result"]
+            data['artifactValidationStatus'][0]['artifactTaskId'] = task['task_details']['virus_task_id']
             data['artifactValidationStatus'][0]['artifactId'] = task['artifactValidations'][0]['artifactId']
             data['artifactValidationStatus'][0]['validationTaskType'] = "SS"
 
-            r = requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+            requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+            task['task_details']['name'] = 'SecurityScan'
+            update_onboarding(task)
 
     # getting license scan task status and sending back to backend portal
     if 'license_task_id' in task['task_details']:
-        license_id = task['task_details']['license_task_id']
-        license_url = '/'.join((URL_TASK_STATUS, 'licenseComp', license_id))
-        f = requests.get(license_url)
-        license_object = f.json()
-
-        time.sleep(3)
-        if license_object["state"] != "":
-            data['status'] = license_object["status"]
+        if task['task_details']["state"] != "":
+            data['status'] = task['task_details']["status"]
             data['taskId'] = task['task_details']['principle_task_id']
             data['solutionId'] = task['solutionId']
             data['revisionId'] = task['revisionId']
             data['visibility'] = task['visibility']
 
-            data['artifactValidationStatus'][0]['status'] = license_object["result"]
-            data['artifactValidationStatus'][0]['artifactTaskId'] = license_id
+            data['artifactValidationStatus'][0]['status'] = task['task_details']["result"]
+            data['artifactValidationStatus'][0]['artifactTaskId'] = task['task_details']['license_task_id']
             data['artifactValidationStatus'][0]['artifactId'] = task['artifactValidations'][0]['artifactId']
             data['artifactValidationStatus'][0]['validationTaskType'] = "LS"
 
-            r = requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+            requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+            task['task_details']['name'] = 'LicenseCheck'
+            update_onboarding(task)
 
     # getting keyword scan task status
     if 'text_task_id' in task['task_details']:
-        text_scan_id = task['task_details']['text_task_id']
-        text_scan_url = '/'.join((URL_TASK_STATUS, 'keywordScan', text_scan_id))
-        z = requests.get(text_scan_url)
-        text_scan_object = z.json()
-
-        if text_scan_object["state"] != "":
-            data['status'] = text_scan_object["status"]
+        if task['task_details']["state"] != "":
+            data['status'] = task['task_details']["status"]
             data['taskId'] = task['task_details']['principle_task_id']
             data['solutionId'] = task['solutionId']
             data['revisionId'] = task['revisionId']
             data['visibility'] = task['visibility']
 
-            data['artifactValidationStatus'][0]['status'] = text_scan_object["result"]
-            data['artifactValidationStatus'][0]['artifactTaskId'] = text_scan_id
+            data['artifactValidationStatus'][0]['status'] = task['task_details']["result"]
+            data['artifactValidationStatus'][0]['artifactTaskId'] = task['task_details']['text_task_id']
             data['artifactValidationStatus'][0]['artifactId'] = task['artifactValidations'][0]['artifactId']
             data['artifactValidationStatus'][0]['validationTaskType'] = "TA"
-            r = requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+            requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+            task['task_details']['name'] = 'TextCheck'
+            update_onboarding(task)
 
     return "done", 201
 
 
-if __name__ == '__main__':
-    formatter = logging.Formatter("%(asctime)s | %(pathname)s | %(levelname)s | %(module)s | %(funcName)s | %(message)s")
-    logHandler = RotatingFileHandler('info.log', maxBytes=1000, backupCount=1)
-    logHandler.setLevel(logging.DEBUG)
-    logHandler.setFormatter(formatter)
-    app.logger.setLevel(logging.DEBUG)
-    app.logger.addHandler(logHandler)
+def update_onboarding(task):
+    if task['task_details']['state'] == 'STARTED':
+        data['statusCode'] = 'ST'
+    elif task['task_details']['state'] == 'FAILURE ':
+        data['statusCode'] = 'FA'
+    elif task['task_details']['state'] == 'SUCCESS ':
+        data['statusCode'] = 'SU'
+    else:
+        data['statusCode'] = ''
 
-    app.run(host="0.0.0.0", port=9604, debug=True)
+    data['artifactId'] = task['artifactValidations'][0]['artifactId']
+    data['name'] = task['task_details']['name']
+    data['result'] = task['task_details']['result']
+    data['revisionId'] = task['revisionId']
+    data['solutionId'] = task['solutionId']
+    data['startDate'] = str(datetime.now().isoformat())
+    data['endDate'] = str(datetime.now().isoformat())
+    data['stepCode'] = task['visibility']
+    data['trackingId'] = task['trackingId']
+    data['userId'] = task['userId']
+    return requests.put(URL_ONBOARDING_CONTROLLER, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+
+
+# Invoke the logger
+@app.after_request
+def after_request(response):
+    if response.status_code != 500:
+        ts = time.strftime('%Y-%b-%d %H:%M')
+        logger.error('%s | %s | %s %s %s | %s',
+                     ts,
+                     request.remote_addr,
+                     request.method,
+                     request.scheme,
+                     request.full_path,
+                     response.status)
+    return response
+
+
+@app.errorhandler(Exception)
+def exceptions(e):
+    ts = time.strftime('%Y-%b-%d %H:%M')
+    # tb = traceback.format_exc()
+    message = [str(x) for x in e.args]
+    logger.error('%s | %s | %s %s %s | %s',
+                 ts,
+                 request.remote_addr,
+                 request.method,
+                 request.scheme,
+                 request.full_path,
+                 message)
+    success = False
+    response = {
+        'success': success,
+        'error': {
+            'type': e.__class__.__name__,
+            'message': message
+        }
+    }
+    return jsonify(response), 500, {'content-type': 'application/json'}
+
+
+if __name__ == '__main__':
+    # The maxBytes is set to this number, in order to demonstrate the generation of multiple log files (backupCount).
+    handler = RotatingFileHandler('validation_middleware.log', maxBytes=1024*1024*100, backupCount=3)
+    logger = logging.getLogger('__name__')
+    logger.setLevel(logging.ERROR)
+    logger.addHandler(handler)
+
+    app.run(host="0.0.0.0", port=9604)

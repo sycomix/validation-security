@@ -26,6 +26,7 @@ from logging.handlers import RotatingFileHandler
 from flask import request
 from flask import abort
 import json
+import time
 from flasgger import Swagger
 
 
@@ -36,9 +37,7 @@ swagger = Swagger(app)
 tasks = []
 
 # Definition of URLs
-URL_INVOKE_TASK = os.environ['URL_INVOKE_TASK']
-URL_TASK_STATUS = os.environ['URL_TASK_STATUS']
-URL_TODO_TASK = os.environ['URL_TODO_TASK']
+URL_INVOKE_TASK = os.environ.get('URL_INVOKE_TASK', None)
 
 data = {
     'status': None,
@@ -49,31 +48,6 @@ data = {
     ],
     'taskId': None
 }
-
-
-@app.route('/status/v1.0/tasks', methods=['GET'])
-def update_task():
-    virus_id = tasks[0]['task_details']['virus_task_id']
-    license_id = tasks[0]['task_details']['license_task_id']
-    text_search_id = tasks[0]['task_details']['text_task_id']
-
-    virus_url = '/'.join((URL_TASK_STATUS, 'securityScan', virus_id))
-    license_url = '/'.join((URL_TASK_STATUS, 'licenseComp', license_id))
-    text_search_url = '/'.join((URL_TASK_STATUS, 'keywordScan', text_search_id))
-
-    q = requests.get(virus_url)
-    f = requests.get(license_url)
-    z = requests.get(text_search_url)
-
-    virus_object = q.json()
-    license_object = f.json()
-    text_search_object = z.json()
-    task = {
-        'Security Scan': virus_object,
-        'License Compliance': license_object,
-        'Keyword Search': text_search_object
-    }
-    return jsonify({'task': task})
 
 
 # OST verb usage
@@ -104,37 +78,61 @@ def create_task():
         'solutionId': request.json['solutionId'],
         'revisionId': request.json['revisionId'],
         'visibility': request.json['visibility'],
-        'artifactValidations': request.json['artifactValidations']
+        'artifactValidations': request.json['artifactValidations'],
+        'trackingId': request.json['trackingId'],
+        'userId': request.json['userId']
     }
-    t = requests.post(URL_INVOKE_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-    task_details = t.json()
+    res = requests.post(URL_INVOKE_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+    task_details = res.json()
     task['task_details'] = task_details
     tasks.append(task)
-
-    r = requests.get(URL_TODO_TASK)
-    # POST verb on the api
-    s = requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
 
     return jsonify({'task': task}), 201
 
 
-# GET verb
-@app.route("/log")
-def logTest():
-    app.logger.warning('testing warning log')
-    app.logger.error('testing error log')
-    app.logger.info('testing info log')
-    return "Code Handbook !! Log testing."
+# Invoke the logger
+@app.after_request
+def after_request(response):
+    if response.status_code != 500:
+        ts = time.strftime('%Y-%b-%d %H:%M')
+        logger.error('%s | %s | %s %s %s | %s',
+                     ts,
+                     request.remote_addr,
+                     request.method,
+                     request.scheme,
+                     request.full_path,
+                     response.status)
+    return response
+
+
+@app.errorhandler(Exception)
+def exceptions(e):
+    ts = time.strftime('%Y-%b-%d %H:%M')
+    # tb = traceback.format_exc()
+    message = [str(x) for x in e.args]
+    logger.error('%s | %s | %s %s %s | %s',
+                 ts,
+                 request.remote_addr,
+                 request.method,
+                 request.scheme,
+                 request.full_path,
+                 message)
+    success = False
+    response = {
+        'success': success,
+        'error': {
+            'type': e.__class__.__name__,
+            'message': message
+        }
+    }
+    return jsonify(response), 500, {'content-type': 'application/json'}
 
 
 if __name__ == '__main__':
-    # formatter = logging.Formatter("%(asctime)s | %(pathname)s:%(lineno)d | %(levelname)s | %(module)s | %(funcName)s | %(message)s ")
-    formatter = logging.Formatter("%(asctime)s | %(pathname)s | %(levelname)s | %(module)s | %(funcName)s | %(message)s")
-    logHandler = RotatingFileHandler('info.log', maxBytes=1000, backupCount=1)
-    logHandler.setLevel(logging.DEBUG)
-    logHandler.setFormatter(formatter)
-    app.logger.setLevel(logging.DEBUG)
-    app.logger.addHandler(logHandler)
+    # The maxBytes is set to this number, in order to demonstrate the generation of multiple log files (backupCount).
+    handler = RotatingFileHandler('validation_client.log', maxBytes=1024*1024*100, backupCount=3)
+    logger = logging.getLogger('__name__')
+    logger.setLevel(logging.ERROR)
+    logger.addHandler(handler)
 
-    app.run(host="0.0.0.0",port=9603 ,debug=True)
-
+    app.run(host="0.0.0.0", port=9603)

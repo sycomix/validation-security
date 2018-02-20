@@ -17,6 +17,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ================================================================================
+
 import os
 import json
 from flask import Flask, request, render_template, session, flash, redirect, \
@@ -26,16 +27,16 @@ import logging
 from logging.handlers import RotatingFileHandler
 import requests
 import uuid
-import re
-from celery.result import AsyncResult
-from celery_worker import *
+import glob
+import time
 
 app = Flask(__name__)
 swagger = Swagger(app)
 app.config['SECRET_KEY'] = 'top-secret!'
 
-URL_CCDS = os.environ['URL_CCDS']
-URL_SITE_CONFIG = os.environ['URL_SITE_CONFIG']
+URL_CCDS = os.environ.get('URL_CCDS', None)
+URL_SITE_CONFIG = os.environ.get('URL_SITE_CONFIG', None)
+URL_TODO_TASK = os.environ.get('URL_TODO_TASK', None)
 
 
 @app.route('/invoketask', methods=['POST'])
@@ -65,8 +66,17 @@ def index():
         'artifactValidations': request.json['artifactValidations']
     }
 
-    get_metadata_url = task['artifactValidations'][-1]['url']
-    json1 = requests.get(get_metadata_url)
+    # Defining the parsed json object
+    def get_metadata():
+        artifact_validation = task['artifactValidations']
+        for artifact in artifact_validation:
+            if artifact['artifactType'] == 'MD':
+                return artifact['url']
+            else:
+                abort(404)
+
+    # get_metadata_url = task['artifactValidations'][-1]['url']
+    json1 = requests.get(get_metadata())
 
     with open('metadata.py', 'w') as outfile:
         json.dump(json1, outfile, ensure_ascii=False)
@@ -79,7 +89,7 @@ def index():
     keywords = json.loads(keyword_to_scan.json()['configValue'])['fields'][-1]['data'].encode()
 
     # temporary database in a listshape
-    keyword_dict = []
+    keyword_dict = list()
     keyword_dict.append(keywords)
     # dict_security = ['verizon', 'AT&T']
     dict_license = ["PSFL", "MIT", "MIT (X11)", "New BSD", "ISC", "Apache", "LGPL", "GPL", "GPLv2", "GPLv3"]
@@ -96,101 +106,174 @@ def index():
     for element in validation_ignore_array['ignore_list']:
         ignore_lst.append(element)
 
-    res = dict()
-    if "Security scan" not in ignore_lst:
-        virus_task = virus_scan_task.apply_async()
-        res['virus_task_id'] = virus_task.id
-
+    principle_task_id = uuid.uuid4()
+    task['task_details']['principle_task_id'] = principle_task_id
     if "License scan" not in ignore_lst:
-        license_task = license_task.apply_async(module_runtime, dict_license)
-        res['license_task_id'] = license_task.id
+        task['task_details']['license_task_id'] = uuid.uuid4()
+        task['task_details']['status'] = 'Started'
+        task['task_details']['result'] = 'License scan - started'
+        task['task_details']['state'] = 'STARTED'
+        # POST verb on the api
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        time.sleep(2)
+        task['task_details']['status'] = 'In-progress'
+        task['task_details']['result'] = 'License scan - in-progress'
+        task['task_details']['state'] = 'PENDING'
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        license_task = license_check(module_runtime, dict_license)
+        time.sleep(5)
+        if license_task == "PASS":
+            task['task_details']['status'] = 'Completed'
+            task['task_details']['result'] = 'License scan - success'
+            task['task_details']['state'] = 'SUCCESS'
+        else:
+            task['task_details']['status'] = 'Completed'
+            task['task_details']['result'] = 'License scan - failed'
+            task['task_details']['state'] = 'FAILURE'
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+
+    if "Security scan" not in ignore_lst:
+        task['task_details']['virus_task_id'] = uuid.uuid4()
+        task['task_details']['status'] = 'Started'
+        task['task_details']['result'] = 'Security scan - started'
+        task['task_details']['state'] = 'STARTED'
+        # POST verb on the api
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        time.sleep(2)
+        task['task_details']['status'] = 'In-progress'
+        task['task_details']['result'] = 'Security scan - in-progress'
+        task['task_details']['state'] = 'PENDING'
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        virus_task = virus_scan()
+        time.sleep(5)
+        if virus_task == "PASS":
+            task['task_details']['status'] = 'Completed'
+            task['task_details']['result'] = 'Security scan - success'
+            task['task_details']['state'] = 'SUCCESS'
+        else:
+            task['task_details']['status'] = 'Completed'
+            task['task_details']['result'] = 'Security scan - failed'
+            task['task_details']['state'] = 'FAILURE'
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
 
     if "Text Check" not in ignore_lst:
-        keyword_task = keyword_scan_task.apply_async(module_name, keyword_dict)
-        res['text_task_id'] = keyword_task.id
-
-    principle_task_id = uuid.uuid4()
-    res['principle_task_id'] = principle_task_id
-
-    return jsonify(res), 202
-
-
-@app.route('/status/<task_name>/<task_id>')
-def taskstatus(task_name, task_id):
-    """Example endpoint returning a list of status by task Id's
-    This is using docstrings for specifications.
-    ---
-    parameters:
-      - name: task_name
-        in: path
-        required: true
-        description: The name of the task, try securityScan!
-        type: string
-      - name: task_id
-        in: path
-        required: true
-        description: The ID of the task, try 42!
-        type: string
-
-    responses:
-      200:
-        description: The task data
-        schema:
-          id: task
-          properties:
-            task_id:
-              type: string
-
-    """
-    if task_name == 'securityScan':
-        task = virus_scan_task.AsyncResult(task_id)
-    elif task_name == 'licenseComp':
-        task = license_task.AsyncResult(task_id)
-    elif task_name == 'keywordScan':
-        task = text_search_task.AsyncResult(task_id)
-    else:
-        abort(404)
-
-    if task.state == 'PENDING':
-        response = {
-            'state': task.state,
-            'current': 0,
-            'task_id': task_id,
-            'total': 1,
-            'status': 'Pending...',
-            'result': 'Not completed!'
-        }
-    elif task.state != 'FAILURE':
-        response1 = {
-            'state': task.state,
-            'task_id': task_id,
-            'current': task.info.get('current', 0),
-            'total': task.info.get('total', 1),
-            'status': task.info.get('status', '')
-        }
-        if 'result' in task.info:
-            response1['result'] = task.info['result']
+        task['task_details']['text_task_id'] = uuid.uuid4()
+        task['task_details']['status'] = 'Started'
+        task['task_details']['result'] = 'Text Check - started'
+        task['task_details']['state'] = 'STARTED'
+        # POST verb on the api
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        time.sleep(2)
+        task['task_details']['status'] = 'In-progress'
+        task['task_details']['result'] = 'Text Check - in-progress'
+        task['task_details']['state'] = 'PENDING'
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        keyword_task = keyword_scan(module_name, keyword_dict)
+        time.sleep(5)
+        if keyword_task == "PASS":
+            task['task_details']['status'] = 'Completed'
+            task['task_details']['result'] = 'Text Check - success'
+            task['task_details']['state'] = 'SUCCESS'
         else:
-            response1['result'] = ''
-        response = response1
-    else:
-        # something went wrong in the background job
-        response = {
-            'state': task.state,
-            'current': 1,
-            'total': 1,
-            'status': str(task.info),  # this is the exception raised
-            'result': 'Failed!'
+            task['task_details']['status'] = 'Completed'
+            task['task_details']['result'] = 'Text Check - failed'
+            task['task_details']['state'] = 'FAILURE'
+        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+
+    return jsonify(task['task_details']), 202
+
+
+# The Virus Scan function
+def virus_scan():
+    """
+    The virus scan function. It will scan the code on provided path using python's bandit library.
+    :return: Pass or Fail
+    """
+    os.system("bandit metadata.py -f json -o outputfile ")
+    # os.system("bandit {0}/*.py -f json -o outputfile ".format(code_path))
+    # os.system("bandit -r ~/{0} -f json -o outputfile ".format(code_path))
+
+    # Scan for an outputfile
+    x = glob.glob('outputfile*')
+    # if the file exists parse the file for the results and make a decision
+    if len(x) == 1:
+        with open('outputfile') as data_file:
+            data = json.loads(data_file)
+
+        if data["results"][0]["issue_severity"] in ['HIGH','MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH','MEDIUM'] :
+            return 'Fail'
+        else:
+            return 'Pass'
+
+
+# Doing license check
+def license_check(module_runtime, dict_license):
+        license_list = []
+        license12 = module_runtime['dependencies']['pip']['requirements']
+        for j in license12:
+            license_list.append(j['name'])
+        for i in dict_license:
+            if i in license_list:
+                return "FAIL"
+            else:
+                return "PASS"
+
+
+# Keyword scan
+def keyword_scan(module_name, keyword_dict):
+    striptext = module_name.replace('\n\n', ' ')
+    keywords_list = striptext.split()
+    keywords_list = [i.lower() for i in keywords_list]
+    for j in keywords_list:
+        if j in keyword_dict:
+            return "FAIL"
+        else:
+            return "PASS"
+
+
+# Invoke the logger
+@app.after_request
+def after_request(response):
+    if response.status_code != 500:
+        ts = time.strftime('%Y-%b-%d %H:%M')
+        logger.error('%s | %s | %s %s %s | %s', 
+                     ts, 
+                     request.remote_addr,
+                     request.method, 
+                     request.scheme, 
+                     request.full_path, 
+                     response.status)
+    return response
+
+
+@app.errorhandler(Exception)
+def exceptions(e):
+    ts = time.strftime('%Y-%b-%d %H:%M')
+    # tb = traceback.format_exc()
+    message = [str(x) for x in e.args]
+    logger.error('%s | %s | %s %s %s | %s',
+                 ts, 
+                 request.remote_addr, 
+                 request.method,
+                 request.scheme, 
+                 request.full_path,
+                 message)
+    success = False
+    response = {
+        'success': success,
+        'error': {
+            'type': e.__class__.__name__,
+            'message': message
         }
-    return jsonify(response)
+    }
+    return jsonify(response), 500, {'content-type': 'application/json'}
 
 
 if __name__ == '__main__':
-    formatter = logging.Formatter("%(asctime)s | %(pathname)s | %(levelname)s | %(module)s | %(funcName)s | %(message)s")
-    logHandler = RotatingFileHandler('info.log', maxBytes=1000, backupCount=1)
-    logHandler.setLevel(logging.DEBUG)
-    logHandler.setFormatter(formatter)
-    app.logger.setLevel(logging.DEBUG)
-    app.logger.addHandler(logHandler)
+    # The maxBytes is set to this number, in order to demonstrate the generation of multiple log files (backupCount).
+    handler = RotatingFileHandler('validation_engine.log', maxBytes=1024*1024*100, backupCount=3)
+    logger = logging.getLogger('__name__')
+    logger.setLevel(logging.ERROR)
+    logger.addHandler(handler)
 
-    app.run(host="0.0.0.0", port=9605, debug=True)
+    app.run(host="0.0.0.0", port=9605)
