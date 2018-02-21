@@ -17,7 +17,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ================================================================================
-
 import os
 import json
 from flask import Flask, request, render_template, session, flash, redirect, \
@@ -37,6 +36,7 @@ app.config['SECRET_KEY'] = 'top-secret!'
 URL_CCDS = os.environ.get('URL_CCDS', None)
 URL_SITE_CONFIG = os.environ.get('URL_SITE_CONFIG', None)
 URL_TODO_TASK = os.environ.get('URL_TODO_TASK', None)
+IGNORE_LIST_CHECK = os.environ.get('IGNORE_LIST_CHECK', 'Disable')
 
 
 @app.route('/invoketask', methods=['POST'])
@@ -63,7 +63,10 @@ def index():
         'solutionId': request.json["solutionId"],
         'revisionId': request.json["revisionId"],
         'visibility': request.json['visibility'],
-        'artifactValidations': request.json['artifactValidations']
+        'artifactValidations': request.json['artifactValidations'],
+        'trackingId': request.json['trackingId'],
+        'userId': request.json['userId'],
+        'task_details': {}
     }
 
     # Defining the parsed json object
@@ -72,44 +75,46 @@ def index():
         for artifact in artifact_validation:
             if artifact['artifactType'] == 'MD':
                 return artifact['url']
+            elif artifact['artifactType'] == 'BP':
+                return artifact['url']
             else:
                 abort(404)
 
-    # get_metadata_url = task['artifactValidations'][-1]['url']
-    json1 = requests.get(get_metadata())
+    metadata_res = requests.get(get_metadata())
+    metadata = metadata_res.json()
 
     with open('metadata.py', 'w') as outfile:
-        json.dump(json1, outfile, ensure_ascii=False)
+        json.dump(metadata, outfile, ensure_ascii=False)
 
-    module_name = json1.json()['name']
-    module_runtime = json1.json()['runtime']
+    module_name = metadata['name']
+    module_runtime = metadata['runtime']
 
     # Realtime site config
     keyword_to_scan = requests.get(URL_CCDS, auth=('ccds_client', 'ccds_client'))
     keywords = json.loads(keyword_to_scan.json()['configValue'])['fields'][-1]['data'].encode()
 
     # temporary database in a listshape
-    keyword_dict = list()
+    keyword_dict = []
     keyword_dict.append(keywords)
     # dict_security = ['verizon', 'AT&T']
     dict_license = ["PSFL", "MIT", "MIT (X11)", "New BSD", "ISC", "Apache", "LGPL", "GPL", "GPLv2", "GPLv3"]
 
-    # Getting ignore list from development server
-    admin_workflow_validation_url = '/'.join((URL_SITE_CONFIG, "local_validation_workflow"))
-    admin_workflow_validation_res = requests.get(admin_workflow_validation_url, auth=('ccds_client', 'ccds_client'))    
-    response = admin_workflow_validation_res.json()
-    json_data = json.loads(response.text)
-    config_val_array = json_data["configValue"]
-    validation_ignore_array = json.loads(config_val_array)
     ignore_lst = []
-
-    for element in validation_ignore_array['ignore_list']:
-        ignore_lst.append(element)
+    if IGNORE_LIST_CHECK == 'Enable':
+        # Getting ignore list from development server
+        admin_workflow_validation_url = '/'.join((URL_SITE_CONFIG, "local_validation_workflow"))
+        admin_workflow_validation_res = requests.get(admin_workflow_validation_url, auth=('ccds_client', 'ccds_client'))
+        response = admin_workflow_validation_res.json()
+        config_val_array = response["response_body"]["configValue"]
+        validation_ignore_array = json.loads(config_val_array)
+        for element in validation_ignore_array['ignore_list']:
+            ignore_lst.append(element)
 
     principle_task_id = uuid.uuid4()
-    task['task_details']['principle_task_id'] = principle_task_id
+    task['task_details']['principle_task_id'] = str(principle_task_id)
     if "License scan" not in ignore_lst:
-        task['task_details']['license_task_id'] = uuid.uuid4()
+        license_task_id = uuid.uuid4()
+        task['task_details']['license_task_id'] = str(license_task_id)
         task['task_details']['status'] = 'Started'
         task['task_details']['result'] = 'License scan - started'
         task['task_details']['state'] = 'STARTED'
@@ -133,7 +138,7 @@ def index():
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
 
     if "Security scan" not in ignore_lst:
-        task['task_details']['virus_task_id'] = uuid.uuid4()
+        task['task_details']['virus_task_id'] = str(uuid.uuid4())
         task['task_details']['status'] = 'Started'
         task['task_details']['result'] = 'Security scan - started'
         task['task_details']['state'] = 'STARTED'
@@ -157,7 +162,7 @@ def index():
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
 
     if "Text Check" not in ignore_lst:
-        task['task_details']['text_task_id'] = uuid.uuid4()
+        task['task_details']['text_task_id'] = str(uuid.uuid4())
         task['task_details']['status'] = 'Started'
         task['task_details']['result'] = 'Text Check - started'
         task['task_details']['state'] = 'STARTED'
@@ -179,7 +184,9 @@ def index():
             task['task_details']['result'] = 'Text Check - failed'
             task['task_details']['state'] = 'FAILURE'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-
+    del task['task_details']['status']
+    del task['task_details']['result']
+    del task['task_details']['state']
     return jsonify(task['task_details']), 202
 
 
@@ -198,25 +205,29 @@ def virus_scan():
     # if the file exists parse the file for the results and make a decision
     if len(x) == 1:
         with open('outputfile') as data_file:
-            data = json.loads(data_file)
+            content = data_file.read()
+            data = json.loads(content)
 
-        if data["results"][0]["issue_severity"] in ['HIGH','MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH','MEDIUM'] :
-            return 'Fail'
+        if not data["results"]:
+            return "PASS"
         else:
-            return 'Pass'
+            if data["results"][0]["issue_severity"] in ['HIGH', 'MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH', 'MEDIUM']:
+                return 'Fail'
+            else:
+                return 'Pass'
 
 
 # Doing license check
 def license_check(module_runtime, dict_license):
-        license_list = []
-        license12 = module_runtime['dependencies']['pip']['requirements']
-        for j in license12:
-            license_list.append(j['name'])
-        for i in dict_license:
-            if i in license_list:
-                return "FAIL"
-            else:
-                return "PASS"
+    license_list = []
+    license12 = module_runtime['dependencies']['pip']['requirements']
+    for j in license12:
+        license_list.append(j['name'])
+    for i in dict_license:
+        if i in license_list:
+            return "FAIL"
+        else:
+            return "PASS"
 
 
 # Keyword scan
