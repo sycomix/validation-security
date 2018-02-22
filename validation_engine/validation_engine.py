@@ -74,11 +74,14 @@ def index():
         artifact_validation = task['artifactValidations']
         for artifact in artifact_validation:
             if artifact['artifactType'] == 'MD':
-                return artifact['url']
+                meta_url = artifact['url']
             elif artifact['artifactType'] == 'BP':
-                return artifact['url']
-            else:
-                abort(404)
+                meta_url = artifact['url']
+
+        if not meta_url:
+            abort(404)
+        else:
+            return meta_url
 
     metadata_res = requests.get(get_metadata())
     metadata = metadata_res.json()
