@@ -126,7 +126,7 @@ def index():
         time.sleep(2)
         task['task_details']['status'] = 'In-progress'
         task['task_details']['result'] = 'License scan - in-progress'
-        task['task_details']['state'] = 'PENDING'
+        task['task_details']['state'] = 'STARTED'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
         license_task = license_check(module_runtime, dict_license)
         time.sleep(5)
@@ -150,7 +150,7 @@ def index():
         time.sleep(2)
         task['task_details']['status'] = 'In-progress'
         task['task_details']['result'] = 'Security scan - in-progress'
-        task['task_details']['state'] = 'PENDING'
+        task['task_details']['state'] = 'STARTED'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
         virus_task = virus_scan()
         time.sleep(5)
@@ -174,7 +174,7 @@ def index():
         time.sleep(2)
         task['task_details']['status'] = 'In-progress'
         task['task_details']['result'] = 'Text Check - in-progress'
-        task['task_details']['state'] = 'PENDING'
+        task['task_details']['state'] = 'STARTED'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
         keyword_task = keyword_scan(module_name, keyword_dict)
         time.sleep(5)

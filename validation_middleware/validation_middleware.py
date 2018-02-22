@@ -133,7 +133,7 @@ def update_onboarding(task):
     elif task['task_details']['state'] == 'SUCCESS ':
         data['statusCode'] = 'SU'
     else:
-        data['statusCode'] = ''
+        data['statusCode'] = 'SU'
 
     data['artifactId'] = task['artifactValidations'][0]['artifactId']
     data['name'] = task['task_details']['name']
@@ -142,7 +142,7 @@ def update_onboarding(task):
     data['solutionId'] = task['solutionId']
     data['startDate'] = str(datetime.now().isoformat())
     data['endDate'] = str(datetime.now().isoformat())
-    data['stepCode'] = task['visibility']
+    data['stepCode'] = 'VL'
     data['trackingId'] = task['trackingId']
     data['userId'] = task['userId']
     return requests.put(URL_ONBOARDING_CONTROLLER, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
