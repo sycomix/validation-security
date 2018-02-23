@@ -127,7 +127,7 @@ def create_task():
 
 def update_onboarding(task):
     if task['task_details']['state'] == 'STARTED':
-        data['statusCode'] = 'ST'
+        data['statusCode'] = 'SU'
     elif task['task_details']['state'] == 'FAILURE ':
         data['statusCode'] = 'FA'
     elif task['task_details']['state'] == 'SUCCESS ':
@@ -145,8 +145,7 @@ def update_onboarding(task):
     data['stepCode'] = 'VL'
     data['trackingId'] = task['trackingId']
     data['userId'] = task['userId']
-	data['statusCode'] = 'SU'
-    return requests.put(URL_ONBOARDING_CONTROLLER, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+	return requests.put(URL_ONBOARDING_CONTROLLER, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
 
 
 # Invoke the logger
