@@ -111,7 +111,7 @@ def index():
     module_runtime = metadata['runtime']
 
     # Realtime site config
-    keyword_to_scan = requests.get(URL_CCDS, auth=('ccds_client', 'ccds_client'))
+    keyword_to_scan = requests.get(URL_CCDS, auth=(CCDS_USERNAME, CCDS_PASSWORD))
     # keywords = json.loads(keyword_to_scan.json()['configValue'])['fields'][-1]['data'].encode()
     fields = json.loads(keyword_to_scan.json()['configValue'])['fields']
     data = ''
@@ -200,6 +200,9 @@ def index():
         text_task_id = str(uuid.uuid4())
         if 'virus_task_id' in task['task_details']:
             del task['task_details']['virus_task_id']
+            
+        if 'license_task_id' in task['task_details']:
+            del task['task_details']['license_task_id']
 
         task['task_details']['text_task_id'] = text_task_id
         task['task_details']['status'] = 'Started'
