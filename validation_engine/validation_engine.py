@@ -34,8 +34,8 @@ swagger = Swagger(app)
 app.config['SECRET_KEY'] = 'top-secret!'
 
 URL_CCDS = os.environ.get('URL_CCDS', None)
-CCDS_USERNAME = os.environ.get('CCDS_USERNAME', None)
-CCDS_PASSWORD = os.environ.get('CCDS_PASSWORD', None)
+CCDS_USERNAME = os.environ.get('CCDS_USERNAME', 'ccds_client')
+CCDS_PASSWORD = os.environ.get('CCDS_PASSWORD', 'ccds_client')
 URL_SITE_CONFIG = os.environ.get('URL_SITE_CONFIG', None)
 URL_TODO_TASK = os.environ.get('URL_TODO_TASK', None)
 IGNORE_LIST_CHECK = os.environ.get('IGNORE_LIST_CHECK', 'Disable')
@@ -130,7 +130,7 @@ def index():
     if IGNORE_LIST_CHECK == 'Enable':
         # Getting ignore list from development server
         admin_workflow_validation_url = '/'.join((URL_SITE_CONFIG, "local_validation_workflow"))
-        admin_workflow_validation_res = requests.get(admin_workflow_validation_url, auth=(CCDS_USERNAME, CCDS_PASSWORD))
+        admin_workflow_validation_res = requests.get(admin_workflow_validation_url, auth=('ccds_client', 'ccds_client'))
         response = admin_workflow_validation_res.json()
         config_val_array = response["response_body"]["configValue"]
         validation_ignore_array = json.loads(config_val_array)
