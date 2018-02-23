@@ -6,5 +6,5 @@
         <!-- docker image name -->
         <artifactId>validation-middleware</artifactId>
         <!-- docker tag -->
-        <version>1.1-SNAPSHOT</version>
+        <version>1.2-SNAPSHOT</version>
 </project>

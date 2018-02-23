@@ -74,6 +74,7 @@ def index():
     # Defining the parsed json object
     def get_artifact_id():
         artifact_validation = task['artifactValidations']
+        artifactid = ''
         for artifact in artifact_validation:
             if artifact['artifactType'] == 'MD':
                 artifactid = artifact['artifactId']
@@ -90,25 +91,29 @@ def index():
     # Defining the parsed json object
     def get_metadata():
         artifact_validation = task['artifactValidations']
+        meta_url = ''
         for artifact in artifact_validation:
             if artifact['artifactType'] == 'MD':
                 meta_url = artifact['url']
             elif artifact['artifactType'] == 'BP':
                 meta_url = artifact['url']
 
-        if not meta_url:
-            abort(404)
-        else:
-            return meta_url
+        return meta_url
 
-    metadata_res = requests.get(get_metadata())
-    metadata = metadata_res.json()
+    metadata_url = get_metadata()
+    module_name = ''
+    module_runtime = ''
+    if metadata_url:
+        metadata_res = requests.get(metadata_url)
+        metadata = metadata_res.json()
 
-    with open('metadata.py', 'w') as outfile:
-        json.dump(metadata, outfile, ensure_ascii=False)
+        with open('metadata.py', 'w') as outfile:
+            json.dump(metadata, outfile, ensure_ascii=False)
 
-    module_name = metadata['name']
-    module_runtime = metadata['runtime']
+        if 'name' in metadata:
+            module_name = metadata['name']
+        if 'runtime' in metadata:
+            module_runtime = metadata['runtime']
 
     # Realtime site config
     keyword_to_scan = requests.get(URL_CCDS, auth=(CCDS_USERNAME, CCDS_PASSWORD))
@@ -130,7 +135,7 @@ def index():
     if IGNORE_LIST_CHECK == 'Enable':
         # Getting ignore list from development server
         admin_workflow_validation_url = '/'.join((URL_SITE_CONFIG, "local_validation_workflow"))
-        admin_workflow_validation_res = requests.get(admin_workflow_validation_url, auth=('ccds_client', 'ccds_client'))
+        admin_workflow_validation_res = requests.get(admin_workflow_validation_url, auth=(CCDS_USERNAME, CCDS_PASSWORD))
         response = admin_workflow_validation_res.json()
         config_val_array = response["response_body"]["configValue"]
         validation_ignore_array = json.loads(config_val_array)
@@ -156,7 +161,12 @@ def index():
         task['task_details']['result'] = 'License scan - in-progress'
         task['task_details']['state'] = 'STARTED'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-        license_task = license_check(module_runtime, dict_license)
+
+        if not module_runtime:
+            license_task = "PASS"
+        else:
+            license_task = license_check(module_runtime, dict_license)
+
         time.sleep(5)
         if license_task == "PASS":
             task['task_details']['status'] = 'Completed'
@@ -184,7 +194,12 @@ def index():
         task['task_details']['result'] = 'Security scan - in-progress'
         task['task_details']['state'] = 'STARTED'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-        virus_task = virus_scan()
+
+        if not module_runtime:
+            virus_task = "PASS"
+        else:
+            virus_task = virus_scan()
+
         time.sleep(5)
         if virus_task == "PASS":
             task['task_details']['status'] = 'Completed'
@@ -200,7 +215,7 @@ def index():
         text_task_id = str(uuid.uuid4())
         if 'virus_task_id' in task['task_details']:
             del task['task_details']['virus_task_id']
-            
+
         if 'license_task_id' in task['task_details']:
             del task['task_details']['license_task_id']
 
@@ -215,7 +230,12 @@ def index():
         task['task_details']['result'] = 'Text Check - in-progress'
         task['task_details']['state'] = 'STARTED'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-        keyword_task = keyword_scan(module_name, keyword_dict)
+
+        if not module_name:
+            keyword_task = "PASS"
+        else:
+            keyword_task = keyword_scan(module_name, keyword_dict)
+
         time.sleep(5)
         if keyword_task == "PASS":
             task['task_details']['status'] = 'Completed'
@@ -242,8 +262,6 @@ def virus_scan():
     :return: Pass or Fail
     """
     os.system("bandit metadata.py -f json -o outputfile ")
-    # os.system("bandit {0}/*.py -f json -o outputfile ".format(code_path))
-    # os.system("bandit -r ~/{0} -f json -o outputfile ".format(code_path))
 
     # Scan for an outputfile
     x = glob.glob('outputfile*')
