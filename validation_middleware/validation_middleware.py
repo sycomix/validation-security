@@ -145,7 +145,7 @@ def update_onboarding(task):
     data['stepCode'] = 'VL'
     data['trackingId'] = task['trackingId']
     data['userId'] = task['userId']
-	return requests.put(URL_ONBOARDING_CONTROLLER, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+    return requests.put(URL_ONBOARDING_CONTROLLER, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
 
 
 # Invoke the logger
