@@ -80,7 +80,7 @@ def create_task():
 
             data['artifactValidationStatus'][0]['status'] = task['task_details']["result"]
             data['artifactValidationStatus'][0]['artifactTaskId'] = task['task_details']['virus_task_id']
-            data['artifactValidationStatus'][0]['artifactId'] = task['artifactValidations'][0]['artifactId']
+            data['artifactValidationStatus'][0]['artifactId'] = task['task_details']['artifactId']
             data['artifactValidationStatus'][0]['validationTaskType'] = "SS"
 
             requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
@@ -98,7 +98,7 @@ def create_task():
 
             data['artifactValidationStatus'][0]['status'] = task['task_details']["result"]
             data['artifactValidationStatus'][0]['artifactTaskId'] = task['task_details']['license_task_id']
-            data['artifactValidationStatus'][0]['artifactId'] = task['artifactValidations'][0]['artifactId']
+            data['artifactValidationStatus'][0]['artifactId'] = task['task_details']['artifactId']
             data['artifactValidationStatus'][0]['validationTaskType'] = "LS"
 
             requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
@@ -116,7 +116,7 @@ def create_task():
 
             data['artifactValidationStatus'][0]['status'] = task['task_details']["result"]
             data['artifactValidationStatus'][0]['artifactTaskId'] = task['task_details']['text_task_id']
-            data['artifactValidationStatus'][0]['artifactId'] = task['artifactValidations'][0]['artifactId']
+            data['artifactValidationStatus'][0]['artifactId'] = task['task_details']['artifactId']
             data['artifactValidationStatus'][0]['validationTaskType'] = "TA"
             requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
             task['task_details']['name'] = 'TextCheck'
@@ -127,7 +127,7 @@ def create_task():
 
 def update_onboarding(task):
     if task['task_details']['state'] == 'STARTED':
-        data['statusCode'] = 'SU'
+        data['statusCode'] = 'ST'
     elif task['task_details']['state'] == 'FAILURE ':
         data['statusCode'] = 'FA'
     elif task['task_details']['state'] == 'SUCCESS ':
@@ -135,7 +135,7 @@ def update_onboarding(task):
     else:
         data['statusCode'] = 'SU'
 
-    data['artifactId'] = task['artifactValidations'][0]['artifactId']
+    data['artifactId'] = task['task_details']['artifactId']
     data['name'] = task['task_details']['name']
     data['result'] = task['task_details']['result']
     data['revisionId'] = task['revisionId']

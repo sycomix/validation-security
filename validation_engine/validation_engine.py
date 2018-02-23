@@ -34,6 +34,8 @@ swagger = Swagger(app)
 app.config['SECRET_KEY'] = 'top-secret!'
 
 URL_CCDS = os.environ.get('URL_CCDS', None)
+CCDS_USERNAME = os.environ.get('CCDS_USERNAME', None)
+CCDS_PASSWORD = os.environ.get('CCDS_PASSWORD', None)
 URL_SITE_CONFIG = os.environ.get('URL_SITE_CONFIG', None)
 URL_TODO_TASK = os.environ.get('URL_TODO_TASK', None)
 IGNORE_LIST_CHECK = os.environ.get('IGNORE_LIST_CHECK', 'Disable')
@@ -70,6 +72,22 @@ def index():
     }
 
     # Defining the parsed json object
+    def get_artifact_id():
+        artifact_validation = task['artifactValidations']
+        for artifact in artifact_validation:
+            if artifact['artifactType'] == 'MD':
+                artifactid = artifact['artifactId']
+            elif artifact['artifactType'] == 'BP':
+                artifactid = artifact['artifactId']
+
+        if not artifactid:
+            return artifact_validation[0]['artifactId']
+        else:
+            return artifactid
+
+    artifactId = get_artifact_id()
+
+    # Defining the parsed json object
     def get_metadata():
         artifact_validation = task['artifactValidations']
         for artifact in artifact_validation:
@@ -94,7 +112,13 @@ def index():
 
     # Realtime site config
     keyword_to_scan = requests.get(URL_CCDS, auth=('ccds_client', 'ccds_client'))
-    keywords = json.loads(keyword_to_scan.json()['configValue'])['fields'][-1]['data'].encode()
+    # keywords = json.loads(keyword_to_scan.json()['configValue'])['fields'][-1]['data'].encode()
+    fields = json.loads(keyword_to_scan.json()['configValue'])['fields']
+    data = ''
+    for item in fields:
+        if item['name'] == 'validationText':
+            data = item['data']
+    keywords = data.encode()
 
     # temporary database in a listshape
     keyword_dict = []
@@ -106,7 +130,7 @@ def index():
     if IGNORE_LIST_CHECK == 'Enable':
         # Getting ignore list from development server
         admin_workflow_validation_url = '/'.join((URL_SITE_CONFIG, "local_validation_workflow"))
-        admin_workflow_validation_res = requests.get(admin_workflow_validation_url, auth=('ccds_client', 'ccds_client'))
+        admin_workflow_validation_res = requests.get(admin_workflow_validation_url, auth=(CCDS_USERNAME, CCDS_PASSWORD))
         response = admin_workflow_validation_res.json()
         config_val_array = response["response_body"]["configValue"]
         validation_ignore_array = json.loads(config_val_array)
@@ -115,6 +139,10 @@ def index():
 
     principle_task_id = uuid.uuid4()
     task['task_details']['principle_task_id'] = str(principle_task_id)
+    task['task_details']['artifactId'] = artifactId
+    license_task_id = ''
+    virus_task_id = ''
+
     if "License scan" not in ignore_lst:
         license_task_id = uuid.uuid4()
         task['task_details']['license_task_id'] = str(license_task_id)
@@ -136,12 +164,16 @@ def index():
             task['task_details']['state'] = 'SUCCESS'
         else:
             task['task_details']['status'] = 'Completed'
-            task['task_details']['result'] = 'License scan - failed'
+            task['task_details']['result'] = license_task
             task['task_details']['state'] = 'FAILURE'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
 
     if "Security scan" not in ignore_lst:
-        task['task_details']['virus_task_id'] = str(uuid.uuid4())
+        virus_task_id = str(uuid.uuid4())
+        if 'license_task_id' in task['task_details']:
+            del task['task_details']['license_task_id']
+
+        task['task_details']['virus_task_id'] = virus_task_id
         task['task_details']['status'] = 'Started'
         task['task_details']['result'] = 'Security scan - started'
         task['task_details']['state'] = 'STARTED'
@@ -165,7 +197,11 @@ def index():
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
 
     if "Text Check" not in ignore_lst:
-        task['task_details']['text_task_id'] = str(uuid.uuid4())
+        text_task_id = str(uuid.uuid4())
+        if 'virus_task_id' in task['task_details']:
+            del task['task_details']['virus_task_id']
+
+        task['task_details']['text_task_id'] = text_task_id
         task['task_details']['status'] = 'Started'
         task['task_details']['result'] = 'Text Check - started'
         task['task_details']['state'] = 'STARTED'
@@ -184,12 +220,15 @@ def index():
             task['task_details']['state'] = 'SUCCESS'
         else:
             task['task_details']['status'] = 'Completed'
-            task['task_details']['result'] = 'Text Check - failed'
+            task['task_details']['result'] = keyword_task
             task['task_details']['state'] = 'FAILURE'
         requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+
     del task['task_details']['status']
     del task['task_details']['result']
     del task['task_details']['state']
+    task['task_details']['license_task_id'] = license_task_id
+    task['task_details']['virus_task_id'] = virus_task_id
     return jsonify(task['task_details']), 202
 
 
@@ -223,12 +262,12 @@ def virus_scan():
 # Doing license check
 def license_check(module_runtime, dict_license):
     license_list = []
-    license12 = module_runtime['dependencies']['pip']['requirements']
-    for j in license12:
+    license_requirements = module_runtime['dependencies']['pip']['requirements']
+    for j in license_requirements:
         license_list.append(j['name'])
     for i in dict_license:
         if i in license_list:
-            return "FAIL"
+            return "FAIL - {0} found in License".format(i)
         else:
             return "PASS"
 
@@ -240,7 +279,7 @@ def keyword_scan(module_name, keyword_dict):
     keywords_list = [i.lower() for i in keywords_list]
     for j in keywords_list:
         if j in keyword_dict:
-            return "FAIL"
+            return "FAIL - {0} found in Keyword Scan".format(j)
         else:
             return "PASS"
 
