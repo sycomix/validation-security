@@ -73,7 +73,7 @@ def create_task():
     if 'virus_task_id' in task['task_details']:
         if task['task_details']["state"] != "":
             data['status'] = task['task_details']["status"]
-            data['taskId'] = task['task_details']['principle_task_id']
+            data['taskId'] = task['trackingId']
             data['solutionId'] = task['solutionId']
             data['revisionId'] = task['revisionId']
             data['visibility'] = task['visibility']
@@ -91,7 +91,7 @@ def create_task():
     if 'license_task_id' in task['task_details']:
         if task['task_details']["state"] != "":
             data['status'] = task['task_details']["status"]
-            data['taskId'] = task['task_details']['principle_task_id']
+            data['taskId'] = task['trackingId']
             data['solutionId'] = task['solutionId']
             data['revisionId'] = task['revisionId']
             data['visibility'] = task['visibility']
@@ -109,7 +109,7 @@ def create_task():
     if 'text_task_id' in task['task_details']:
         if task['task_details']["state"] != "":
             data['status'] = task['task_details']["status"]
-            data['taskId'] = task['task_details']['principle_task_id']
+            data['taskId'] = task['trackingId']
             data['solutionId'] = task['solutionId']
             data['revisionId'] = task['revisionId']
             data['visibility'] = task['visibility']
@@ -118,6 +118,7 @@ def create_task():
             data['artifactValidationStatus'][0]['artifactTaskId'] = task['task_details']['text_task_id']
             data['artifactValidationStatus'][0]['artifactId'] = task['task_details']['artifactId']
             data['artifactValidationStatus'][0]['validationTaskType'] = "TA"
+
             requests.put(portal_task_url, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
             task['task_details']['name'] = 'TextCheck'
             update_onboarding(task)
@@ -126,26 +127,42 @@ def create_task():
 
 
 def update_onboarding(task):
-    if task['task_details']['state'] == 'STARTED':
-        data['statusCode'] = 'ST'
-    elif task['task_details']['state'] == 'FAILURE ':
-        data['statusCode'] = 'FA'
-    elif task['task_details']['state'] == 'SUCCESS ':
-        data['statusCode'] = 'SU'
-    else:
-        data['statusCode'] = 'SU'
+    step_result = {
+        'statusCode': None,
+        'artifactId': None,
+        'name': None,
+        'result': None,
+        'revisionId': None,
+        'solutionId': None,
+        'startDate': None,
+        'endDate': None,
+        'stepCode': None,
+        'trackingId': None,
+        'userId': None
+    }
 
-    data['artifactId'] = task['task_details']['artifactId']
-    data['name'] = task['task_details']['name']
-    data['result'] = task['task_details']['result']
-    data['revisionId'] = task['revisionId']
-    data['solutionId'] = task['solutionId']
-    data['startDate'] = str(datetime.now().isoformat())
-    data['endDate'] = str(datetime.now().isoformat())
-    data['stepCode'] = 'VL'
-    data['trackingId'] = task['trackingId']
-    data['userId'] = task['userId']
-    return requests.put(URL_ONBOARDING_CONTROLLER, json.dumps(data), headers={"Content-type": "application/json; charset=utf8"})
+    if task['task_details']['state'] == 'STARTED':
+        step_result['statusCode'] = 'ST'
+    elif task['task_details']['state'] == 'FAILURE':
+        step_result['statusCode'] = 'FA'
+    elif task['task_details']['state'] == 'SUCCESS':
+        step_result['statusCode'] = 'SU'
+    else:
+        step_result['statusCode'] = 'FA'
+
+    step_result['artifactId'] = task['task_details']['artifactId']
+    step_result['name'] = task['task_details']['name']
+    step_result['result'] = task['task_details']['result']
+    step_result['revisionId'] = task['revisionId']
+    step_result['solutionId'] = task['solutionId']
+    step_result['startDate'] = str(datetime.now().isoformat())
+    step_result['endDate'] = str(datetime.now().isoformat())
+    step_result['stepCode'] = 'VL'
+    step_result['trackingId'] = task['trackingId']
+    step_result['userId'] = task['userId']
+
+    logger.error('%s', step_result)
+    requests.put(URL_ONBOARDING_CONTROLLER, json.dumps(step_result), headers={"Content-type": "application/json; charset=utf8"})
 
 
 # Invoke the logger

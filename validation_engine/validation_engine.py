@@ -71,25 +71,27 @@ def index():
         'task_details': {}
     }
 
+    artifact_type = ''
+
     # Defining the parsed json object
     def get_artifact_id():
         artifact_validation = task['artifactValidations']
         artifactid = ''
+        nonlocal artifact_type
         for artifact in artifact_validation:
             if artifact['artifactType'] == 'MD':
                 artifactid = artifact['artifactId']
+                artifact_type = artifact['artifactType']
             elif artifact['artifactType'] == 'BP':
                 artifactid = artifact['artifactId']
+                artifact_type = artifact['artifactType']
 
-        if not artifactid:
-            return artifact_validation[0]['artifactId']
-        else:
-            return artifactid
+        return artifactid
 
     artifactId = get_artifact_id()
 
     # Defining the parsed json object
-    def get_metadata():
+    def get_metadata_url():
         artifact_validation = task['artifactValidations']
         meta_url = ''
         for artifact in artifact_validation:
@@ -100,7 +102,7 @@ def index():
 
         return meta_url
 
-    metadata_url = get_metadata()
+    metadata_url = get_metadata_url()
     module_name = ''
     module_runtime = ''
     if metadata_url:
@@ -147,112 +149,133 @@ def index():
     task['task_details']['artifactId'] = artifactId
     license_task_id = ''
     virus_task_id = ''
+    text_task_id = ''
 
     if "License scan" not in ignore_lst:
-        license_task_id = uuid.uuid4()
-        task['task_details']['license_task_id'] = str(license_task_id)
-        task['task_details']['status'] = 'Started'
-        task['task_details']['result'] = 'License scan - started'
-        task['task_details']['state'] = 'STARTED'
-        # POST verb on the api
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-        time.sleep(2)
-        task['task_details']['status'] = 'In-progress'
-        task['task_details']['result'] = 'License scan - in-progress'
-        task['task_details']['state'] = 'STARTED'
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-
-        if not module_runtime:
-            license_task = "PASS"
-        else:
-            license_task = license_check(module_runtime, dict_license)
-
-        time.sleep(5)
-        if license_task == "PASS":
-            task['task_details']['status'] = 'Completed'
-            task['task_details']['result'] = 'License scan - success'
-            task['task_details']['state'] = 'SUCCESS'
-        else:
-            task['task_details']['status'] = 'Completed'
-            task['task_details']['result'] = license_task
-            task['task_details']['state'] = 'FAILURE'
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        license_task_id = invoke_license_task(task, artifact_type, module_runtime, dict_license)
 
     if "Security scan" not in ignore_lst:
-        virus_task_id = str(uuid.uuid4())
         if 'license_task_id' in task['task_details']:
             del task['task_details']['license_task_id']
 
-        task['task_details']['virus_task_id'] = virus_task_id
-        task['task_details']['status'] = 'Started'
-        task['task_details']['result'] = 'Security scan - started'
-        task['task_details']['state'] = 'STARTED'
-        # POST verb on the api
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-        time.sleep(2)
-        task['task_details']['status'] = 'In-progress'
-        task['task_details']['result'] = 'Security scan - in-progress'
-        task['task_details']['state'] = 'STARTED'
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-
-        if not module_runtime:
-            virus_task = "PASS"
-        else:
-            virus_task = virus_scan()
-
-        time.sleep(5)
-        if virus_task == "PASS":
-            task['task_details']['status'] = 'Completed'
-            task['task_details']['result'] = 'Security scan - success'
-            task['task_details']['state'] = 'SUCCESS'
-        else:
-            task['task_details']['status'] = 'Completed'
-            task['task_details']['result'] = 'Security scan - failed'
-            task['task_details']['state'] = 'FAILURE'
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        virus_task_id = invoke_security_task(task, artifact_type)
 
     if "Text Check" not in ignore_lst:
-        text_task_id = str(uuid.uuid4())
         if 'virus_task_id' in task['task_details']:
             del task['task_details']['virus_task_id']
 
         if 'license_task_id' in task['task_details']:
             del task['task_details']['license_task_id']
 
-        task['task_details']['text_task_id'] = text_task_id
-        task['task_details']['status'] = 'Started'
-        task['task_details']['result'] = 'Text Check - started'
-        task['task_details']['state'] = 'STARTED'
-        # POST verb on the api
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-        time.sleep(2)
-        task['task_details']['status'] = 'In-progress'
-        task['task_details']['result'] = 'Text Check - in-progress'
-        task['task_details']['state'] = 'STARTED'
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
-
-        if not module_name:
-            keyword_task = "PASS"
-        else:
-            keyword_task = keyword_scan(module_name, keyword_dict)
-
-        time.sleep(5)
-        if keyword_task == "PASS":
-            task['task_details']['status'] = 'Completed'
-            task['task_details']['result'] = 'Text Check - success'
-            task['task_details']['state'] = 'SUCCESS'
-        else:
-            task['task_details']['status'] = 'Completed'
-            task['task_details']['result'] = keyword_task
-            task['task_details']['state'] = 'FAILURE'
-        requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+        text_task_id = invoke_keyword_task(task, artifact_type, module_name, keyword_dict)
 
     del task['task_details']['status']
     del task['task_details']['result']
     del task['task_details']['state']
     task['task_details']['license_task_id'] = license_task_id
     task['task_details']['virus_task_id'] = virus_task_id
+    task['task_details']['text_task_id'] = text_task_id
     return jsonify(task['task_details']), 202
+
+
+def invoke_license_task(task, artifact_type, module_runtime, dict_license):
+    license_task_id = uuid.uuid4()
+    task['task_details']['license_task_id'] = str(license_task_id)
+    task['task_details']['status'] = 'Started'
+    task['task_details']['result'] = 'License scan - started'
+    task['task_details']['state'] = 'STARTED'
+    # POST verb on the api
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+    time.sleep(2)
+    task['task_details']['status'] = 'In-progress'
+    task['task_details']['result'] = 'License scan - in-progress'
+    task['task_details']['state'] = 'STARTED'
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+
+    if not artifact_type:
+        license_task = "FAIL - Artifact Type should be MD or BP."
+    elif not module_runtime:
+        license_task = "PASS"
+    else:
+        license_task = license_check(module_runtime, dict_license)
+
+    time.sleep(5)
+    if license_task == "PASS":
+        task['task_details']['status'] = 'Completed'
+        task['task_details']['result'] = 'License scan - success'
+        task['task_details']['state'] = 'SUCCESS'
+    else:
+        task['task_details']['status'] = 'Completed'
+        task['task_details']['result'] = license_task
+        task['task_details']['state'] = 'FAILURE'
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+    return license_task_id
+
+
+def invoke_security_task(task, artifact_type):
+    virus_task_id = str(uuid.uuid4())
+    task['task_details']['virus_task_id'] = virus_task_id
+    task['task_details']['status'] = 'Started'
+    task['task_details']['result'] = 'Security scan - started'
+    task['task_details']['state'] = 'STARTED'
+    # POST verb on the api
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+    time.sleep(2)
+    task['task_details']['status'] = 'In-progress'
+    task['task_details']['result'] = 'Security scan - in-progress'
+    task['task_details']['state'] = 'STARTED'
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+
+    if not artifact_type:
+        virus_task = "FAIL - Artifact Type should be MD or BP."
+    else:
+        virus_task = virus_scan()
+
+    time.sleep(5)
+    if virus_task == "PASS":
+        task['task_details']['status'] = 'Completed'
+        task['task_details']['result'] = 'Security scan - success'
+        task['task_details']['state'] = 'SUCCESS'
+    else:
+        task['task_details']['status'] = 'Completed'
+        task['task_details']['result'] = virus_task
+        task['task_details']['state'] = 'FAILURE'
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+    return virus_task_id
+
+
+def invoke_keyword_task(task, artifact_type, module_name, keyword_dict):
+    text_task_id = str(uuid.uuid4())
+    task['task_details']['text_task_id'] = text_task_id
+    task['task_details']['status'] = 'Started'
+    task['task_details']['result'] = 'Text Check - started'
+    task['task_details']['state'] = 'STARTED'
+    # POST verb on the api
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+    time.sleep(2)
+    task['task_details']['status'] = 'In-progress'
+    task['task_details']['result'] = 'Text Check - in-progress'
+    task['task_details']['state'] = 'STARTED'
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+
+    if not artifact_type:
+        keyword_task = "FAIL - Artifact Type should be MD or BP"
+    elif not module_name:
+        keyword_task = "PASS"
+    else:
+        keyword_task = keyword_scan(module_name, keyword_dict)
+
+    time.sleep(5)
+    if keyword_task == "PASS":
+        task['task_details']['status'] = 'Completed'
+        task['task_details']['result'] = 'Text Check - success'
+        task['task_details']['state'] = 'SUCCESS'
+    else:
+        task['task_details']['status'] = 'Completed'
+        task['task_details']['result'] = keyword_task
+        task['task_details']['state'] = 'FAILURE'
+    requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
+    return text_task_id
 
 
 # The Virus Scan function
@@ -275,9 +298,9 @@ def virus_scan():
             return "PASS"
         else:
             if data["results"][0]["issue_severity"] in ['HIGH', 'MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH', 'MEDIUM']:
-                return 'Fail'
+                return 'FAIL - Security Scan failed.'
             else:
-                return 'Pass'
+                return 'PASS'
 
 
 # Doing license check
