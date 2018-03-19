@@ -72,23 +72,14 @@ def index():
     }
 
     artifact_type = ''
-
-    # Defining the parsed json object
-    def get_artifact_id():
-        artifact_validation = task['artifactValidations']
-        artifactid = ''
-        nonlocal artifact_type
-        for artifact in artifact_validation:
-            if artifact['artifactType'] == 'MD':
-                artifactid = artifact['artifactId']
-                artifact_type = artifact['artifactType']
-            elif artifact['artifactType'] == 'BP':
-                artifactid = artifact['artifactId']
-                artifact_type = artifact['artifactType']
-
-        return artifactid
-
-    artifactId = get_artifact_id()
+    artifactId = ''
+    for artifact in task['artifactValidations']:
+        if artifact['artifactType'] == 'MD':
+            artifactId = artifact['artifactId']
+            artifact_type = artifact['artifactType']
+        elif artifact['artifactType'] == 'BP':
+            artifactId = artifact['artifactId']
+            artifact_type = artifact['artifactType']
 
     # Defining the parsed json object
     def get_metadata_url():
@@ -151,14 +142,14 @@ def index():
     virus_task_id = ''
     text_task_id = ''
 
-    if "License scan" not in ignore_lst:
-        license_task_id = invoke_license_task(task, artifact_type, module_runtime, dict_license)
-
     if "Security scan" not in ignore_lst:
-        if 'license_task_id' in task['task_details']:
-            del task['task_details']['license_task_id']
-
         virus_task_id = invoke_security_task(task, artifact_type)
+
+    if "License scan" not in ignore_lst:
+        if 'virus_task_id' in task['task_details']:
+            del task['task_details']['virus_task_id']
+
+        license_task_id = invoke_license_task(task, artifact_type, module_runtime, dict_license)
 
     if "Text Check" not in ignore_lst:
         if 'virus_task_id' in task['task_details']:
@@ -284,48 +275,66 @@ def virus_scan():
     The virus scan function. It will scan the code on provided path using python's bandit library.
     :return: Pass or Fail
     """
-    os.system("bandit metadata.py -f json -o outputfile ")
+    try:
+        os.system("bandit metadata.py -f json -o outputfile ")
 
-    # Scan for an outputfile
-    x = glob.glob('outputfile*')
-    # if the file exists parse the file for the results and make a decision
-    if len(x) == 1:
-        with open('outputfile') as data_file:
-            content = data_file.read()
-            data = json.loads(content)
+        # Scan for an outputfile
+        x = glob.glob('outputfile*')
+        # if the file exists parse the file for the results and make a decision
+        if len(x) == 1:
+            with open('outputfile') as data_file:
+                content = data_file.read()
+                data = json.loads(content)
 
-        if not data["results"]:
-            return "PASS"
-        else:
-            if data["results"][0]["issue_severity"] in ['HIGH', 'MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH', 'MEDIUM']:
-                return 'FAIL - Security Scan failed.'
+            if not data["results"]:
+                return "PASS"
             else:
-                return 'PASS'
+                if data["results"][0]["issue_severity"] in ['HIGH', 'MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH', 'MEDIUM']:
+                    return 'FAIL - Security Scan failed.'
+                else:
+                    return 'PASS'
+    except:
+        return 'FAIL - Security Scan failed.'
 
 
 # Doing license check
 def license_check(module_runtime, dict_license):
-    license_list = []
-    license_requirements = module_runtime['dependencies']['pip']['requirements']
-    for j in license_requirements:
-        license_list.append(j['name'])
-    for i in dict_license:
-        if i in license_list:
-            return "FAIL - {0} found in License".format(i)
+    try:
+        license_list = []
+        if 'dependencies' in module_runtime:
+            module_dependencies = module_runtime['dependencies']
+            key = list(module_dependencies.keys())[0]
+            check_list = module_dependencies[key]
+            if 'requirements' in check_list:
+                license_requirements = check_list['requirements']
+                for j in license_requirements:
+                    license_list.append(j['name'])
+                for i in dict_license:
+                    if i in license_list:
+                        return "FAIL - {0} found in License".format(i)
+                    else:
+                        return "PASS"
+            else:
+                return "FAIL - Requirements not found in metadata"
         else:
-            return "PASS"
+            return "FAIL - Dependencies not found in metadata"
+    except:
+        return "FAIL"
 
 
 # Keyword scan
 def keyword_scan(module_name, keyword_dict):
-    striptext = module_name.replace('\n\n', ' ')
-    keywords_list = striptext.split()
-    keywords_list = [i.lower() for i in keywords_list]
-    for j in keywords_list:
-        if j in keyword_dict:
-            return "FAIL - {0} found in Keyword Scan".format(j)
-        else:
-            return "PASS"
+    try:
+        striptext = module_name.replace('\n\n', ' ')
+        keywords_list = striptext.split()
+        keywords_list = [i.lower() for i in keywords_list]
+        for j in keywords_list:
+            if j in keyword_dict:
+                return "FAIL - {0} found in Keyword Scan".format(j)
+            else:
+                return "PASS"
+    except:
+        return "FAIL"
 
 
 # Invoke the logger
