@@ -1,0 +1,62 @@
+---
+project: 'validation-security'
+project_creation_date: '2017-11-30'
+project_category: ''
+lifecycle_state: 'Incubation'
+project_lead: &acumos_validation-security_ptl
+    name: 'Guy Jacobson'
+    email: 'gj2418@att.com'
+    id: ''
+    company: 'ATT'
+    timezone: 'America/New_York'
+primary_contact: '*acumos_validation-security_ptl'
+issue_tracking:
+    type: 'jira'
+    url: 'https://jira.acumos.org/projects/ACUMOS'
+    key: 'ACUMOS'
+mailing_list:
+    type: 'groups.io'
+    url: 'lists.acumos.org'
+    tag: '<[sub-project_name]>'
+realtime_discussion:
+    type: 'irc'
+    server: 'freenode.net'
+    channel: '#acumos'
+meetings:
+    - type: 'zoom'
+      agenda: ''
+      url: 'https://zoom.us/j/4906631713'
+      server: 'n/a'
+      channel: 'n/a'
+      repeats: 'weekly'
+      time: '08:00 US ET'
+repositories:
+    - 'validation-security'
+committers:
+    - <<: *acumos_validation-security_ptl
+    - name: 'Aimee Ukasick'
+      email: 'aimeeu@research.att.com'
+      company: 'ATT'
+      id: 'aimeeu'
+      timezone: 'America/Chicago'
+    - name: 'Mrityunjay Yadav'
+      email: 'my00514913@TechMahindra.com'
+      company: 'Tech Mahindra'
+      id: 'My00514913'
+      timezone: ''
+    - name: 'Manoop Talasila'
+      email: 'talasila@research.att.com'
+      company: 'ATT'
+      id: 'talasila'
+      timezone: 'America/New_York'
+    - name: 'Vikas Gera'
+      email: 'Vg0043194@techmahindra.com'
+      company: 'Tech Mahindra'
+      id: 'vg0043194'
+      timezone: ''
+tsc:
+    approval: ''
+    changes:
+        - type: ''
+          name: ''
+          link: ''
