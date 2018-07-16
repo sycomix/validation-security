@@ -18,6 +18,5 @@
 Validation and Security
 =======================
 
-The Validation and Security microservice scans files for vulnerabilities.
-
-Official documentation may be found at http://docs.acumos.org.
+This component has been deprecrecated, and this repo has been made read-only. 
+The new security component is located in the security-verification repo. 
