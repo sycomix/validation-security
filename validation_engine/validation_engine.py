@@ -223,12 +223,11 @@ def invoke_security_task(task, artifact_type):
         virus_task = virus_scan()
 
     time.sleep(5)
+    task['task_details']['status'] = 'Completed'
     if virus_task == "PASS":
-        task['task_details']['status'] = 'Completed'
         task['task_details']['result'] = 'Security scan - success'
         task['task_details']['state'] = 'SUCCESS'
     else:
-        task['task_details']['status'] = 'Completed'
         task['task_details']['result'] = virus_task
         task['task_details']['state'] = 'FAILURE'
     requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
@@ -257,12 +256,11 @@ def invoke_keyword_task(task, artifact_type, module_name, keyword_dict):
         keyword_task = keyword_scan(module_name, keyword_dict)
 
     time.sleep(5)
+    task['task_details']['status'] = 'Completed'
     if keyword_task == "PASS":
-        task['task_details']['status'] = 'Completed'
         task['task_details']['result'] = 'Text Check - success'
         task['task_details']['state'] = 'SUCCESS'
     else:
-        task['task_details']['status'] = 'Completed'
         task['task_details']['result'] = keyword_task
         task['task_details']['state'] = 'FAILURE'
     requests.post(URL_TODO_TASK, json.dumps(task), headers={"Content-type": "application/json; charset=utf8"})
@@ -288,11 +286,10 @@ def virus_scan():
 
             if not data["results"]:
                 return "PASS"
+            if data["results"][0]["issue_severity"] in ['HIGH', 'MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH', 'MEDIUM']:
+                return 'FAIL - Security Scan failed.'
             else:
-                if data["results"][0]["issue_severity"] in ['HIGH', 'MEDIUM'] and data["results"][0]['issue_confidence'] in ['HIGH', 'MEDIUM']:
-                    return 'FAIL - Security Scan failed.'
-                else:
-                    return 'PASS'
+                return 'PASS'
     except:
         return 'FAIL - Security Scan failed.'
 
@@ -300,24 +297,17 @@ def virus_scan():
 # Doing license check
 def license_check(module_runtime, dict_license):
     try:
-        license_list = []
-        if 'dependencies' in module_runtime:
-            module_dependencies = module_runtime['dependencies']
-            key = list(module_dependencies.keys())[0]
-            check_list = module_dependencies[key]
-            if 'requirements' in check_list:
-                license_requirements = check_list['requirements']
-                for j in license_requirements:
-                    license_list.append(j['name'])
-                for i in dict_license:
-                    if i in license_list:
-                        return "FAIL - {0} found in License".format(i)
-                    else:
-                        return "PASS"
-            else:
-                return "FAIL - Requirements not found in metadata"
-        else:
+        if 'dependencies' not in module_runtime:
             return "FAIL - Dependencies not found in metadata"
+        module_dependencies = module_runtime['dependencies']
+        key = list(module_dependencies.keys())[0]
+        check_list = module_dependencies[key]
+        if 'requirements' not in check_list:
+            return "FAIL - Requirements not found in metadata"
+        license_requirements = check_list['requirements']
+        license_list = [j['name'] for j in license_requirements]
+        for i in dict_license:
+            return "FAIL - {0} found in License".format(i) if i in license_list else "PASS"
     except:
         return "FAIL"
 

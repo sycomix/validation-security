@@ -22,18 +22,14 @@ import gensim
 
 def readfile(filename, keyword):
 
-    saved_word = []
 # read file
     with open(filename) as file_search:   #open search file
         file_search = file_search.readlines()   #read file
-    for lines in file_search:    # every word is scaned
-           if keyword in lines:   # extract the keyword
-                saved_word.append(lines)    #store all found keywords in array
-        # write in new file
+    saved_word = [lines for lines in file_search if keyword in lines]
     with open('CompleteResponse.txt', 'w') as file_handler:
         file_handler.write(f"{filename}\n")
-        for i in range(len(saved_word)):
-            file_handler.write(f"{saved_word[i]}")
+        for item in saved_word:
+            file_handler.write(f"{item}")
 
     print('done') # completed
 
@@ -56,8 +52,4 @@ dict = []
 
 def keyword_scan():
     for i in keywords_list:
-        if i in dict:
-            return "Fail"
-    
-        else:
-            return "Pass"
+        return "Fail" if i in dict else "Pass"

@@ -60,7 +60,7 @@ def candidates(word):
 
 def known(words): 
     "The subset of `words` that appear in the dictionary of WORDS."
-    return set(w for w in words if w in WORDS)
+    return {w for w in words if w in WORDS}
 
 More_permission = ["PSFL","MIT","MIT (X11)", "New BSD", "ISC", "Apache" ]
 
@@ -96,7 +96,4 @@ list1 = text.split()
 
 def License_compliance1():
     for i in list1:
-        if i in Less_permissive:
-            return ( 'Fail')
-        else:
-            return ("Pass")
+        return 'Fail' if i in Less_permissive else "Pass"

@@ -115,36 +115,23 @@ def keyword_scan(module_name, keyword_dict):
     keywords_list = striptext.split()
     keywords_list = [i.lower() for i in keywords_list]
     for j in keywords_list:
-        if j in keyword_dict:
-            return "FAIL"
-        else:
-            return "PASS"
+        return "FAIL" if j in keyword_dict else "PASS"
 
 
 # Doing license check
 def license_check(module_runtime, dict_license):
-        license_list = []
-        license12 = module_runtime['dependencies']['pip']['requirements']
-        for j in license12:
-            license_list.append(j['name'])
-        for i in dict_license:
-            if i in license_list:
-                return "FAIL"
-            else:
-                return "PASS"
+    license12 = module_runtime['dependencies']['pip']['requirements']
+    license_list = [j['name'] for j in license12]
+    for i in dict_license:
+        return "FAIL" if i in license_list else "PASS"
 
 
 # Doing Security check
 def security_check(module_runtime, dict_security):
-        security_list = []
-        security12 = module_runtime['dependencies']['pip']['requirements']
-        for j in security12:
-            security_list.append(j['name'])
-        for i in dict_security:
-            if i in security_list:
-                return "FAIL"
-            else:
-                return "PASS"
+    security12 = module_runtime['dependencies']['pip']['requirements']
+    security_list = [j['name'] for j in security12]
+    for i in dict_security:
+        return "FAIL" if i in security_list else "PASS"
 
 
 # The Virus Scan function

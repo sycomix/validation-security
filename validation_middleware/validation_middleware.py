@@ -143,13 +143,13 @@ def update_onboarding(task):
 
     if task['task_details']['state'] == 'STARTED':
         step_result['statusCode'] = 'ST'
-    elif task['task_details']['state'] == 'FAILURE':
+    elif (
+        task['task_details']['state'] == 'FAILURE'
+        or task['task_details']['state'] != 'SUCCESS'
+    ):
         step_result['statusCode'] = 'FA'
-    elif task['task_details']['state'] == 'SUCCESS':
-        step_result['statusCode'] = 'SU'
     else:
-        step_result['statusCode'] = 'FA'
-
+        step_result['statusCode'] = 'SU'
     step_result['artifactId'] = task['task_details']['artifactId']
     step_result['name'] = task['task_details']['name']
     step_result['result'] = task['task_details']['result']
